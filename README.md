@@ -2,10 +2,6 @@
 
 Procédure de génération de container PostgreSQL.
 
-## Plateformes supportées
-
-* Debian 8
-
 ## Variables d'environnement
 
 Attribute        | Description | Type | Default
@@ -20,7 +16,7 @@ PGDATA | postgres data path | string | /var/lib/postgresql/data
 Build
 
 ```
-docker build -t dsipf/postgres:latest jessie
+docker build -t dsipf/postgres:latest 11
 ```
 
 --------------
@@ -28,15 +24,15 @@ docker build -t dsipf/postgres:latest jessie
 Exécution
 
 ```
-docker run --name my-postgres -d -p 5432:5432 postgres
+docker run --name my-postgres -d -p 5432:5432 dsipf/postgres
 ```
 
 ```
-docker run --name my-postgres -d -p 5432:5432 -v postgres_sample:/var/lib/postgresql postgres
+docker run --name my-postgres -d -p 5432:5432 -v postgres_sample:/var/lib/postgresql dispf/postgres
 ```
 
 ```
-docker run --name my-postgres -d [-p 5432:5432] [-e POSTGRES_DB=my_database] [-e POSTGRES_USER=my_user] [-e POSTGRES_PASSWORD=my_password] postgres
+docker run --name my-postgres -d [-p 5432:5432] [-e POSTGRES_DB=my_database] [-e POSTGRES_USER=my_user] [-e POSTGRES_PASSWORD=my_password] dsipf/postgres
 ```
 
 > Configuration par défaut: 
