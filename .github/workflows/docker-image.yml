@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        versions: [9.6, 10, 11]
+        versions: [9.6, 10, 11, 12]
     env:
       repo: "govpf/postgres"
     steps:
