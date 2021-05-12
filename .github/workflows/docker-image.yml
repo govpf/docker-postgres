@@ -22,7 +22,7 @@ jobs:
       uses: actions/checkout@v2
     -
       name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v1
+      uses: docker/setup-buildx-action@v1.3.0
     -
       name: gpg hack
       run: wget -qO- 'https://github.com/tianon/pgp-happy-eyeballs/raw/master/hack-my-builds.sh' | bash
