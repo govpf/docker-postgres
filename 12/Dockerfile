@@ -23,7 +23,7 @@ RUN set -eux; \
 
 # grab gosu for easy step-down from root
 # https://github.com/tianon/gosu/releases
-ENV GOSU_VERSION 1.12
+ENV GOSU_VERSION 1.14
 RUN set -eux; \
 	savedAptMark="$(apt-mark showmanual)"; \
 	apt-get update; \
@@ -85,7 +85,7 @@ RUN set -ex; \
 ENV PG_MAJOR 12
 ENV PATH $PATH:/usr/lib/postgresql/$PG_MAJOR/bin
 
-ENV PG_VERSION 12.8-1.pgdg110+1
+ENV PG_VERSION 12.9-1.pgdg110+1
 
 RUN set -ex; \
 	\

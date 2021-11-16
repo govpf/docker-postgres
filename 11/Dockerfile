@@ -1,5 +1,5 @@
 # vim:set ft=dockerfile:
-FROM govpf/debian:stretch
+FROM govpf/debian:bullseye
 
 RUN set -ex; \
 	if ! command -v gpg > /dev/null; then \
@@ -23,7 +23,7 @@ RUN set -eux; \
 
 # grab gosu for easy step-down from root
 # https://github.com/tianon/gosu/releases
-ENV GOSU_VERSION 1.12
+ENV GOSU_VERSION 1.14
 RUN set -eux; \
 	savedAptMark="$(apt-mark showmanual)"; \
 	apt-get update; \
@@ -85,7 +85,7 @@ RUN set -ex; \
 ENV PG_MAJOR 11
 ENV PATH $PATH:/usr/lib/postgresql/$PG_MAJOR/bin
 
-ENV PG_VERSION 11.13-1.pgdg90+1
+ENV PG_VERSION 11.14-1.pgdg110+1
 
 RUN set -ex; \
 	\
@@ -94,18 +94,15 @@ RUN set -ex; \
 	\
 	dpkgArch="$(dpkg --print-architecture)"; \
 	case "$dpkgArch" in \
-		amd64 | i386 | ppc64el) \
+		amd64 | arm64 | ppc64el) \
 # arches officialy built by upstream
-			echo "deb http://apt.postgresql.org/pub/repos/apt/ stretch-pgdg main $PG_MAJOR" > /etc/apt/sources.list.d/pgdg.list; \
+			echo "deb http://apt.postgresql.org/pub/repos/apt/ bullseye-pgdg main $PG_MAJOR" > /etc/apt/sources.list.d/pgdg.list; \
 			apt-get update; \
 			;; \
 		*) \
 # we're on an architecture upstream doesn't officially build for
 # let's build binaries from their published source packages
-			echo "deb-src http://apt.postgresql.org/pub/repos/apt/ stretch-pgdg main $PG_MAJOR" > /etc/apt/sources.list.d/pgdg.list; \
-			\
-# https://github.com/docker-library/postgres/issues/484 (clang-6.0 required, only available in stretch-backports)
-			echo 'deb http://deb.debian.org/debian stretch-backports main' >> /etc/apt/sources.list.d/pgdg.list; \
+			echo "deb-src http://apt.postgresql.org/pub/repos/apt/ bullseye-pgdg main $PG_MAJOR" > /etc/apt/sources.list.d/pgdg.list; \
 			\
 			tempDir="$(mktemp -d)"; \
 			cd "$tempDir"; \
