@@ -64,12 +64,9 @@ ENV LANG en_US.utf8
 RUN set -eux; \
 	apt-get update; \
 	apt-get install -y --no-install-recommends \
-# install "nss_wrapper" in case we need to fake "/etc/passwd" and "/etc/group" (especially for OpenShift)
-# https://github.com/docker-library/postgres/issues/359
-# https://cwrap.org/nss_wrapper.html
 		libnss-wrapper \
-# install "xz-utils" for .sql.xz docker-entrypoint-initdb.d files
 		xz-utils \
+		zstd \
 	; \
 	rm -rf /var/lib/apt/lists/*
 
@@ -81,16 +78,16 @@ RUN set -ex; \
 # uid                  PostgreSQL Debian Repository
 	key='B97B0AFCAA1A47F044F244A07FCC7D46ACCC4CF8'; \
 	export GNUPGHOME="$(mktemp -d)"; \
+	mkdir -p /usr/local/share/keyrings/; \
 	gpg --batch --keyserver keyserver.ubuntu.com --recv-keys "$key"; \
-	gpg --batch --export "$key" > /etc/apt/trusted.gpg.d/postgres.gpg; \
+	gpg --batch --export --armor "$key" > /usr/local/share/keyrings/postgres.gpg.asc; \
 	command -v gpgconf > /dev/null && gpgconf --kill all; \
-	rm -rf "$GNUPGHOME"; \
-	apt-key list
+	rm -rf "$GNUPGHOME"
 
 ENV PG_MAJOR 13
 ENV PATH $PATH:/usr/lib/postgresql/$PG_MAJOR/bin
 
-ENV PG_VERSION 13.5-1.pgdg110+1
+ENV PG_VERSION 13.6-1.pgdg110+1
 
 RUN set -ex; \
 	\
@@ -98,35 +95,50 @@ RUN set -ex; \
 	export PYTHONDONTWRITEBYTECODE=1; \
 	\
 	dpkgArch="$(dpkg --print-architecture)"; \
+	aptRepo="[ signed-by=/usr/local/share/keyrings/postgres.gpg.asc ] http://apt.postgresql.org/pub/repos/apt/ bullseye-pgdg main $PG_MAJOR"; \
 	case "$dpkgArch" in \
 		amd64 | arm64 | ppc64el) \
 # arches officialy built by upstream
-			echo "deb http://apt.postgresql.org/pub/repos/apt/ bullseye-pgdg main $PG_MAJOR" > /etc/apt/sources.list.d/pgdg.list; \
+			echo "deb $aptRepo" > /etc/apt/sources.list.d/pgdg.list; \
 			apt-get update; \
 			;; \
 		*) \
 # we're on an architecture upstream doesn't officially build for
 # let's build binaries from their published source packages
-			echo "deb-src http://apt.postgresql.org/pub/repos/apt/ bullseye-pgdg main $PG_MAJOR" > /etc/apt/sources.list.d/pgdg.list; \
+			echo "deb-src $aptRepo" > /etc/apt/sources.list.d/pgdg.list; \
+			\
+			savedAptMark="$(apt-mark showmanual)"; \
 			\
 			tempDir="$(mktemp -d)"; \
 			cd "$tempDir"; \
 			\
-			savedAptMark="$(apt-mark showmanual)"; \
+# create a temporary local APT repo to install from (so that dependency resolution can be handled by APT, as it should be)
+			apt-get update; \
+			apt-get install -y --no-install-recommends dpkg-dev; \
+			echo "deb [ trusted=yes ] file://$tempDir ./" > /etc/apt/sources.list.d/temp.list; \
+			_update_repo() { \
+				dpkg-scanpackages . > Packages; \
+# work around the following APT issue by using "Acquire::GzipIndexes=false" (overriding "/etc/apt/apt.conf.d/docker-gzip-indexes")
+#   Could not open file /var/lib/apt/lists/partial/_tmp_tmp.ODWljpQfkE_._Packages - open (13: Permission denied)
+#   ...
+#   E: Failed to fetch store:/var/lib/apt/lists/partial/_tmp_tmp.ODWljpQfkE_._Packages  Could not open file /var/lib/apt/lists/partial/_tmp_tmp.ODWljpQfkE_._Packages - open (13: Permission denied)
+				apt-get -o Acquire::GzipIndexes=false update; \
+			}; \
+			_update_repo; \
 			\
 # build .deb files from upstream's source packages (which are verified by apt-get)
-			apt-get update; \
+			nproc="$(nproc)"; \
+			export DEB_BUILD_OPTIONS="nocheck parallel=$nproc"; \
+# we have to build postgresql-common first because postgresql-$PG_MAJOR shares "debian/rules" logic with it: https://salsa.debian.org/postgresql/postgresql/-/commit/99f44476e258cae6bf9e919219fa2c5414fa2876
+# (and it "Depends: pgdg-keyring")
+			apt-get build-dep -y postgresql-common pgdg-keyring; \
+			apt-get source --compile postgresql-common pgdg-keyring; \
+			_update_repo; \
 # we need DEBIAN_FRONTEND on postgresql-13 for slapd ("Please enter the password for the admin entry in your LDAP directory."); see https://bugs.debian.org/929417
 			DEBIAN_FRONTEND=noninteractive \
-			apt-get build-dep -y \
-				postgresql-common pgdg-keyring \
-				"postgresql-$PG_MAJOR=$PG_VERSION" \
-			; \
-			DEB_BUILD_OPTIONS="nocheck parallel=$(nproc)" \
-				apt-get source --compile \
-					postgresql-common pgdg-keyring \
-					"postgresql-$PG_MAJOR=$PG_VERSION" \
-			; \
+			apt-get build-dep -y "postgresql-$PG_MAJOR=$PG_VERSION"; \
+			apt-get source --compile "postgresql-$PG_MAJOR=$PG_VERSION"; \
+			\
 # we don't remove APT lists here because they get re-downloaded and removed later
 			\
 # reset apt-mark's "manual" list so that "purge --auto-remove" will remove all build dependencies
@@ -134,16 +146,10 @@ RUN set -ex; \
 			apt-mark showmanual | xargs apt-mark auto > /dev/null; \
 			apt-mark manual $savedAptMark; \
 			\
-# create a temporary local APT repo to install from (so that dependency resolution can be handled by APT, as it should be)
 			ls -lAFh; \
-			dpkg-scanpackages . > Packages; \
+			_update_repo; \
 			grep '^Package: ' Packages; \
-			echo "deb [ trusted=yes ] file://$tempDir ./" > /etc/apt/sources.list.d/temp.list; \
-# work around the following APT issue by using "Acquire::GzipIndexes=false" (overriding "/etc/apt/apt.conf.d/docker-gzip-indexes")
-#   Could not open file /var/lib/apt/lists/partial/_tmp_tmp.ODWljpQfkE_._Packages - open (13: Permission denied)
-#   ...
-#   E: Failed to fetch store:/var/lib/apt/lists/partial/_tmp_tmp.ODWljpQfkE_._Packages  Could not open file /var/lib/apt/lists/partial/_tmp_tmp.ODWljpQfkE_._Packages - open (13: Permission denied)
-			apt-get -o Acquire::GzipIndexes=false update; \
+			cd /; \
 			;; \
 	esac; \
 	\

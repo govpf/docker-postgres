@@ -172,10 +172,11 @@ docker_process_init_files() {
 					. "$f"
 				fi
 				;;
-			*.sql)    echo "$0: running $f"; docker_process_sql -f "$f"; echo ;;
-			*.sql.gz) echo "$0: running $f"; gunzip -c "$f" | docker_process_sql; echo ;;
-			*.sql.xz) echo "$0: running $f"; xzcat "$f" | docker_process_sql; echo ;;
-			*)        echo "$0: ignoring $f" ;;
+			*.sql)     echo "$0: running $f"; docker_process_sql -f "$f"; echo ;;
+			*.sql.gz)  echo "$0: running $f"; gunzip -c "$f" | docker_process_sql; echo ;;
+			*.sql.xz)  echo "$0: running $f"; xzcat "$f" | docker_process_sql; echo ;;
+			*.sql.zst) echo "$0: running $f"; zstd -dc "$f" | docker_process_sql; echo ;;
+			*)         echo "$0: ignoring $f" ;;
 		esac
 		echo
 	done
@@ -240,10 +241,6 @@ pg_setup_hba_conf() {
 	local auth
 	# check the default/configured encryption and use that as the auth method
 	auth="$(postgres -C password_encryption "$@")"
-	# postgres 9 only reports "on" and not "md5"
-	if [ "$auth" = 'on' ]; then
-		auth='md5'
-	fi
 	: "${POSTGRES_HOST_AUTH_METHOD:=$auth}"
 	{
 		echo
