@@ -38,11 +38,11 @@ docker_create_db_directories() {
 
 	mkdir -p "$PGDATA"
 	# ignore failure since there are cases where we can't chmod (and PostgreSQL might fail later anyhow - it's picky about permissions of this directory)
-	chmod 700 "$PGDATA" || :
+	chmod 00700 "$PGDATA" || :
 
 	# ignore failure since it will be fine when using the image provided directory; see also https://github.com/docker-library/postgres/pull/289
 	mkdir -p /var/run/postgresql || :
-	chmod 775 /var/run/postgresql || :
+	chmod 03775 /var/run/postgresql || :
 
 	# Create the transaction log directory before initdb is run so the directory is owned by the correct user
 	if [ -n "${POSTGRES_INITDB_WALDIR:-}" ]; then
@@ -103,20 +103,24 @@ docker_init_database_dir() {
 # print large warning if POSTGRES_HOST_AUTH_METHOD is set to 'trust'
 # assumes database is not set up, ie: [ -z "$DATABASE_ALREADY_EXISTS" ]
 docker_verify_minimum_env() {
-	# check password first so we can output the warning before postgres
-	# messes it up
-	if [ "${#POSTGRES_PASSWORD}" -ge 100 ]; then
-		cat >&2 <<-'EOWARN'
+	case "${PG_MAJOR:-}" in
+		12 | 13) # https://github.com/postgres/postgres/commit/67a472d71c98c3d2fa322a1b4013080b20720b98
+			# check password first so we can output the warning before postgres
+			# messes it up
+			if [ "${#POSTGRES_PASSWORD}" -ge 100 ]; then
+				cat >&2 <<-'EOWARN'
 
-			WARNING: The supplied POSTGRES_PASSWORD is 100+ characters.
+					WARNING: The supplied POSTGRES_PASSWORD is 100+ characters.
 
-			  This will not work if used via PGPASSWORD with "psql".
+					  This will not work if used via PGPASSWORD with "psql".
 
-			  https://www.postgresql.org/message-id/flat/E1Rqxp2-0004Qt-PL%40wrigleys.postgresql.org (BUG #6412)
-			  https://github.com/docker-library/postgres/issues/507
+					  https://www.postgresql.org/message-id/flat/E1Rqxp2-0004Qt-PL%40wrigleys.postgresql.org (BUG #6412)
+					  https://github.com/docker-library/postgres/issues/507
 
-		EOWARN
-	fi
+				EOWARN
+			fi
+			;;
+	esac
 	if [ -z "$POSTGRES_PASSWORD" ] && [ 'trust' != "$POSTGRES_HOST_AUTH_METHOD" ]; then
 		# The - option suppresses leading tabs but *not* spaces. :)
 		cat >&2 <<-'EOE'
@@ -225,6 +229,7 @@ docker_setup_env() {
 	: "${POSTGRES_HOST_AUTH_METHOD:=}"
 
 	declare -g DATABASE_ALREADY_EXISTS
+	: "${DATABASE_ALREADY_EXISTS:=}"
 	# look specifically for PG_VERSION, as it is expected in the DB dir
 	if [ -s "$PGDATA/PG_VERSION" ]; then
 		DATABASE_ALREADY_EXISTS='true'
