@@ -11,8 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        # Versions 9.6 and 10 are deprecated
-        versions: [12, 13, 15, 16]
+        # Versions 9.6 and 10, 12, 13 are deprecated
+        versions: [15, 16]
     env:
       repo: "govpf/postgres"
     steps:
