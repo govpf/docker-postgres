@@ -75,17 +75,22 @@ RUN set -eux; \
 
 RUN mkdir /docker-entrypoint-initdb.d
 
+# RUN set -ex; \
+# # pub   4096R/ACCC4CF8 2011-10-13 [expires: 2019-07-02]
+# #       Key fingerprint = B97B 0AFC AA1A 47F0 44F2  44A0 7FCC 7D46 ACCC 4CF8
+# # uid                  PostgreSQL Debian Repository
+# 	key='B97B0AFCAA1A47F044F244A07FCC7D46ACCC4CF8'; \
+# 	export GNUPGHOME="$(mktemp -d)"; \
+# 	mkdir -p /usr/local/share/keyrings/; \
+# 	gpg --batch --keyserver keyserver.ubuntu.com --recv-keys "$key"; \
+# 	gpg --batch --export --armor "$key" > /usr/local/share/keyrings/postgres.gpg.asc; \
+# 	gpgconf --kill all; \
+# 	rm -rf "$GNUPGHOME"
+
 RUN set -ex; \
-# pub   4096R/ACCC4CF8 2011-10-13 [expires: 2019-07-02]
-#       Key fingerprint = B97B 0AFC AA1A 47F0 44F2  44A0 7FCC 7D46 ACCC 4CF8
-# uid                  PostgreSQL Debian Repository
-	key='B97B0AFCAA1A47F044F244A07FCC7D46ACCC4CF8'; \
-	export GNUPGHOME="$(mktemp -d)"; \
-	mkdir -p /usr/local/share/keyrings/; \
-	gpg --batch --keyserver keyserver.ubuntu.com --recv-keys "$key"; \
-	gpg --batch --export --armor "$key" > /usr/local/share/keyrings/postgres.gpg.asc; \
-	gpgconf --kill all; \
-	rm -rf "$GNUPGHOME"
+    mkdir -p /usr/local/share/keyrings; \
+    curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+    -o /usr/local/share/keyrings/postgres.gpg.asc
 
 ENV PG_MAJOR 16
 ENV PATH $PATH:/usr/lib/postgresql/$PG_MAJOR/bin
@@ -157,7 +162,8 @@ RUN set -ex; \
 	apt-get install -y --no-install-recommends postgresql-common; \
 	sed -ri 's/#(create_main_cluster) .*$/\1 = false/' /etc/postgresql-common/createcluster.conf; \
 	apt-get install -y --no-install-recommends \
-		"postgresql-$PG_MAJOR=$PG_VERSION" \
+		# "postgresql-$PG_MAJOR=$PG_VERSION" \
+		"postgresql-$PG_MAJOR" \
 	; \
 	\
 	rm -rf /var/lib/apt/lists/*; \
