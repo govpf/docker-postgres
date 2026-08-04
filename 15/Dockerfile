@@ -6,6 +6,9 @@
 
 FROM govpf/debian:bookworm
 
+LABEL govpf.fromimage="govpf/debian:bookworm"
+LABEL govpf.category="database"
+
 # explicitly set user/group IDs
 RUN set -eux; \
 	groupadd -r postgres --gid=999; \
